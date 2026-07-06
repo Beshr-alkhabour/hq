@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0e1013">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Beshr HQ">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Beshr HQ — Runs & Luminary Studio</title>
+<style>
+  :root{
+    --bg:#0e1013; --card:#171a20; --card2:#1e222a; --line:#262b34;
+    --text:#e8eaed; --muted:#9aa3af; --faint:#6b7280;
+    --amber:#f5b942; --amber-dim:rgba(245,185,66,.14);
+    --green:#4ade80; --green-dim:rgba(74,222,128,.13);
+    --red:#f87171; --blue:#60a5fa;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;line-height:1.5;min-height:100vh}
+  .wrap{max-width:920px;margin:0 auto;padding:28px 18px 80px}
+
+  header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:26px}
+  .brand h1{font-size:1.45rem;font-weight:700;letter-spacing:.2px}
+  .brand h1 span{color:var(--amber)}
+  .brand p{color:var(--muted);font-size:.85rem}
+  .tabs{display:flex;gap:8px;background:var(--card);padding:5px;border-radius:999px;border:1px solid var(--line)}
+  .tabs button{border:0;background:transparent;color:var(--muted);padding:9px 20px;border-radius:999px;font-size:.95rem;font-weight:600;cursor:pointer;transition:.15s}
+  .tabs button.active-runs{background:var(--green-dim);color:var(--green)}
+  .tabs button.active-agency{background:var(--amber-dim);color:var(--amber)}
+
+  section{display:none}
+  section.visible{display:block}
+  .grid{display:grid;gap:14px}
+  .stats{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+  .stat .label{color:var(--muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.6px}
+  .stat .value{font-size:1.5rem;font-weight:700;margin-top:2px}
+  .stat .sub{color:var(--faint);font-size:.75rem}
+  .accent-g{color:var(--green)} .accent-a{color:var(--amber)}
+
+  .race{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px;
+        background:linear-gradient(120deg,#14241a, #12181f);border:1px solid #1f3527}
+  .race .big{font-size:2rem;font-weight:800;color:var(--green)}
+  .race input[type=date]{background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px 8px;font-size:.85rem}
+  .race .muted{color:var(--muted);font-size:.85rem}
+
+  h2{font-size:1.02rem;font-weight:700;margin:22px 0 10px}
+  h2 small{color:var(--faint);font-weight:400;font-size:.8rem;margin-left:8px}
+
+  form.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:4px;flex:1 1 120px}
+  .field.grow{flex:2 1 180px}
+  .field label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  input,select,textarea{background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 11px;font-size:.92rem;font-family:inherit;width:100%}
+  input:focus,select:focus,textarea:focus{outline:1px solid var(--amber);border-color:var(--amber)}
+  button.btn{border:0;border-radius:9px;padding:10px 18px;font-weight:700;font-size:.92rem;cursor:pointer;transition:.15s}
+  .btn-g{background:var(--green);color:#07220f}
+  .btn-a{background:var(--amber);color:#2a1d00}
+  .btn:hover{filter:brightness(1.1)}
+  .btn-ghost{background:transparent;color:var(--faint);border:1px solid var(--line);font-weight:500}
+
+  .bar-outer{background:var(--card2);border-radius:999px;height:10px;overflow:hidden;margin-top:8px}
+  .bar-inner{height:100%;background:linear-gradient(90deg,#22c55e,#4ade80);border-radius:999px;transition:width .4s}
+
+  .chart{display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:8px}
+  .chart .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+  .chart .bar{width:100%;max-width:34px;background:linear-gradient(180deg,#4ade80,#15803d);border-radius:6px 6px 2px 2px;min-height:2px}
+  .chart .lbl{font-size:.62rem;color:var(--faint);white-space:nowrap}
+  .chart .val{font-size:.66rem;color:var(--muted)}
+
+  table{width:100%;border-collapse:collapse;font-size:.9rem}
+  th{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  .del{background:none;border:0;color:var(--faint);cursor:pointer;font-size:1rem;padding:2px 6px;border-radius:6px}
+  .del:hover{color:var(--red);background:rgba(248,113,113,.1)}
+  .note-txt{color:var(--muted);font-size:.8rem}
+
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:700;letter-spacing:.3px}
+  .lead-row select{width:auto;padding:6px 8px;font-size:.8rem}
+  .lead-name{font-weight:700}
+  .lead-meta{color:var(--muted);font-size:.8rem}
+  .pipeline-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .pipeline-summary .chip{background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:.78rem;color:var(--muted)}
+  .pipeline-summary .chip b{color:var(--text)}
+
+  ul.tasks{list-style:none}
+  ul.tasks li{display:flex;align-items:center;gap:11px;padding:9px 4px;border-bottom:1px solid var(--line)}
+  ul.tasks li:last-child{border-bottom:0}
+  ul.tasks input[type=checkbox]{width:17px;height:17px;accent-color:var(--amber);flex:none}
+  ul.tasks li.done span{color:var(--faint);text-decoration:line-through}
+  ul.tasks span{flex:1}
+
+  .empty{color:var(--faint);font-size:.86rem;padding:14px 4px;text-align:center}
+  footer{margin-top:36px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--faint);font-size:.76rem}
+  footer .io{display:flex;gap:8px}
+  @media(max-width:560px){ .race .big{font-size:1.5rem} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <h1>Beshr <span>HQ</span></h1>
+      <p>Runs &amp; Luminary Studio — everything in one place</p>
+    </div>
+    <nav class="tabs">
+      <button id="tab-runs" onclick="showTab('runs')">🏃 Runs</button>
+      <button id="tab-agency" onclick="showTab('agency')">💼 Agency</button>
+    </nav>
+  </header>
+
+  <!-- ================= RUNS ================= -->
+  <section id="sec-runs">
+    <div class="card race">
+      <div>
+        <div class="stat"><div class="label">Vienna City Marathon — Half</div></div>
+        <div class="big" id="race-days">—</div>
+        <div class="muted">days to go</div>
+      </div>
+      <div style="flex:1;min-width:220px">
+        <div class="muted" style="margin-bottom:4px">Longest run vs 21.1 km</div>
+        <div class="bar-outer"><div class="bar-inner" id="hm-bar" style="width:0%"></div></div>
+        <div class="muted" id="hm-progress" style="margin-top:5px;font-size:.8rem"></div>
+      </div>
+      <div>
+        <div class="stat"><div class="label">Race date</div></div>
+        <input type="date" id="race-date" onchange="setRaceDate(this.value)">
+      </div>
+    </div>
+
+    <div class="grid stats" id="run-stats"></div>
+
+    <h2>Add a run</h2>
+    <div class="card">
+      <form class="row" onsubmit="addRun(event)">
+        <div class="field"><label>Date</label><input type="date" id="r-date" required></div>
+        <div class="field"><label>Distance (km)</label><input type="number" id="r-km" step="0.01" min="0.1" placeholder="7.0" required></div>
+        <div class="field"><label>Time (h:mm:ss or mm:ss)</label><input type="text" id="r-time" placeholder="65:19" required pattern="^(\d{1,2}:)?\d{1,3}:\d{2}$"></div>
+        <div class="field grow"><label>Note (optional)</label><input type="text" id="r-note" placeholder="midnight run, felt good"></div>
+        <button class="btn btn-g" type="submit">Add run</button>
+      </form>
+    </div>
+
+    <h2>Weekly kilometers <small>last 12 weeks</small></h2>
+    <div class="card"><div class="chart" id="week-chart"></div></div>
+
+    <h2>Run log</h2>
+    <div class="card" style="padding:6px 10px">
+      <table id="run-table">
+        <thead><tr><th>Date</th><th>Km</th><th>Time</th><th>Pace</th><th>Note</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="run-empty">No runs yet. Your baseline: 7 km in 56:19 (8:03/km) — log your next one!</div>
+    </div>
+  </section>
+
+  <!-- ================= AGENCY ================= -->
+  <section id="sec-agency">
+    <div class="grid stats" id="agency-stats"></div>
+
+    <h2>Lead pipeline <small>local shops → first paying customer</small></h2>
+    <div class="card">
+      <form class="row" onsubmit="addLead(event)">
+        <div class="field grow"><label>Shop / business</label><input type="text" id="l-name" placeholder="Blumen Maier, 1050 Wien" required></div>
+        <div class="field"><label>Contact</label><input type="text" id="l-contact" placeholder="owner name / phone"></div>
+        <div class="field"><label>Value (€)</label><input type="number" id="l-value" min="0" step="50" placeholder="800"></div>
+        <div class="field grow"><label>Notes</label><input type="text" id="l-notes" placeholder="no website yet, spoke to owner briefly"></div>
+        <button class="btn btn-a" type="submit">Add lead</button>
+      </form>
+    </div>
+
+    <div style="height:12px"></div>
+    <div class="pipeline-summary" id="pipe-summary"></div>
+    <div class="card" style="padding:6px 10px">
+      <table id="lead-table">
+        <thead><tr><th>Shop</th><th>Status</th><th>Value</th><th>Notes</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="lead-empty">
+        No leads yet. Walk your neighbourhood: every shop without a website (or with an ugly one) is a lead.<br>
+        Add 10 shops here, then start with "Contacted".
+      </div>
+    </div>
+
+    <h2>Tasks <small>what moves Luminary Studio forward</small></h2>
+    <div class="card">
+      <form class="row" onsubmit="addTask(event)">
+        <div class="field grow"><label>New task</label><input type="text" id="t-text" placeholder="e.g. rebuild portfolio site with new branding" required></div>
+        <button class="btn btn-a" type="submit">Add</button>
+      </form>
+      <ul class="tasks" id="task-list"></ul>
+      <div class="empty" id="task-empty">Suggestions: ① rebuild portfolio site with the new logo/colors ② set a starting package price ③ write a 30-second pitch ④ list 10 local shops as leads.</div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Data is saved locally in this browser (localStorage) — nothing leaves your computer.</span>
+    <span class="io">
+      <button class="btn btn-ghost" onclick="exportData()">Export backup</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('import-file').click()">Import</button>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
+    </span>
+  </footer>
+</div>
+
+<script>
+"use strict";
+const KEY = "beshr-hq";
+const STATUSES = ["To contact","Contacted","Meeting","Offer sent","Won","Lost"];
+const STATUS_COLOR = {"To contact":"#9aa3af","Contacted":"#60a5fa","Meeting":"#c084fc","Offer sent":"#f5b942","Won":"#4ade80","Lost":"#f87171"};
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+/* sanitize untrusted data (imported backups, tampered storage): coerce types,
+   regenerate ids, whitelist statuses — so nothing unsafe reaches the DOM */
+const sStr  = v => typeof v === "string" ? v.slice(0,500) : "";
+const sNum  = v => { const n = parseFloat(v); return isFinite(n) && n >= 0 ? n : 0; };
+const sDate = v => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) ? v : "";
+function sanitize(d){
+  const out = {runs:[],leads:[],tasks:[],settings:{raceDate:"2027-04-11"}};
+  if(!d || typeof d !== "object") return out;
+  if(Array.isArray(d.runs)) out.runs = d.runs
+    .map(r => ({id:uid(), date:sDate(r?.date), km:sNum(r?.km), sec:sNum(r?.sec), note:sStr(r?.note)}))
+    .filter(r => r.date && r.km > 0 && r.sec > 0);
+  if(Array.isArray(d.leads)) out.leads = d.leads
+    .map(l => ({id:uid(), name:sStr(l?.name), contact:sStr(l?.contact), value:sNum(l?.value),
+                notes:sStr(l?.notes), status:STATUSES.includes(l?.status) ? l.status : "To contact",
+                created:sDate(l?.created) || "1970-01-01"}))
+    .filter(l => l.name);
+  if(Array.isArray(d.tasks)) out.tasks = d.tasks
+    .map(t => ({id:uid(), text:sStr(t?.text), done:!!t?.done}))
+    .filter(t => t.text);
+  const rd = sDate(d.settings && d.settings.raceDate);
+  if(rd) out.settings.raceDate = rd;
+  return out;
+}
+let db = load();
+function load(){
+  try{ return sanitize(JSON.parse(localStorage.getItem(KEY))); }
+  catch(e){ return sanitize(null); }
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(db)); }
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------- tabs ---------- */
+function showTab(t){
+  document.getElementById("sec-runs").classList.toggle("visible", t==="runs");
+  document.getElementById("sec-agency").classList.toggle("visible", t==="agency");
+  document.getElementById("tab-runs").className = t==="runs" ? "active-runs" : "";
+  document.getElementById("tab-agency").className = t==="agency" ? "active-agency" : "";
+  localStorage.setItem(KEY+"-tab", t);
+}
+
+/* ---------- helpers ---------- */
+function parseTime(str){ // "65:19" or "1:05:19" -> seconds
+  const p = str.trim().split(":").map(Number);
+  if(p.some(isNaN)) return null;
+  if(p.length===2) return p[0]*60 + p[1];
+  if(p.length===3) return p[0]*3600 + p[1]*60 + p[2];
+  return null;
+}
+function fmtDur(sec){
+  const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = Math.round(sec%60);
+  return (h? h+":"+String(m).padStart(2,"0") : m) + ":" + String(s).padStart(2,"0");
+}
+function fmtPace(secPerKm){
+  const m = Math.floor(secPerKm/60), s = Math.round(secPerKm%60);
+  return m + ":" + String(s).padStart(2,"0") + "/km";
+}
+function fmtDate(iso){
+  const d = new Date(iso+"T12:00:00");
+  return d.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"2-digit"});
+}
+const eur = n => "€" + (+n||0).toLocaleString("en-AT");
+
+/* ---------- RUNS ---------- */
+function addRun(e){
+  e.preventDefault();
+  const km = parseFloat(document.getElementById("r-km").value);
+  const sec = parseTime(document.getElementById("r-time").value);
+  if(!km || !sec){ alert("Please check distance and time."); return; }
+  db.runs.push({id:uid(), date:document.getElementById("r-date").value, km, sec,
+                note:document.getElementById("r-note").value.trim()});
+  save(); e.target.reset(); document.getElementById("r-date").value = today();
+  renderRuns();
+}
+function delRun(id){ db.runs = db.runs.filter(r=>r.id!==id); save(); renderRuns(); }
+function isoLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function today(){ return isoLocal(new Date()); }
+function setRaceDate(v){ if(v){ db.settings.raceDate = v; save(); renderRuns(); } }
+
+function renderRuns(){
+  const runs = [...db.runs].sort((a,b)=> b.date.localeCompare(a.date));
+  // race countdown
+  document.getElementById("race-date").value = db.settings.raceDate;
+  const days = Math.ceil((new Date(db.settings.raceDate) - new Date())/86400000);
+  document.getElementById("race-days").textContent = days > 0 ? days : (days===0 ? "TODAY" : "done");
+  // HM progress
+  const longest = runs.length ? Math.max(...runs.map(r=>r.km)) : 0;
+  const pct = Math.min(100, longest/21.1*100);
+  document.getElementById("hm-bar").style.width = pct.toFixed(1)+"%";
+  document.getElementById("hm-progress").textContent = longest
+    ? `${longest.toFixed(1)} km of 21.1 km (${pct.toFixed(0)}%)` : "log a run to see progress";
+  // stats
+  const now = new Date();
+  const wkAgo = isoLocal(new Date(now - 7*86400000));
+  const moAgo = isoLocal(new Date(now - 30*86400000));
+  const totKm = runs.reduce((s,r)=>s+r.km,0), totSec = runs.reduce((s,r)=>s+r.sec,0);
+  const wkKm = runs.filter(r=>r.date>=wkAgo).reduce((s,r)=>s+r.km,0);
+  const moKm = runs.filter(r=>r.date>=moAgo).reduce((s,r)=>s+r.km,0);
+  const best = runs.length ? Math.min(...runs.map(r=>r.sec/r.km)) : 0;
+  document.getElementById("run-stats").innerHTML = [
+    ["Runs", runs.length, ""],
+    ["Total km", totKm.toFixed(1), ""],
+    ["Last 7 days", wkKm.toFixed(1)+" km", ""],
+    ["Last 30 days", moKm.toFixed(1)+" km", ""],
+    ["Avg pace", totKm? fmtPace(totSec/totKm):"—", ""],
+    ["Best pace", best? fmtPace(best):"—", ""],
+  ].map(([l,v])=>`<div class="card stat"><div class="label">${l}</div><div class="value accent-g">${v}</div></div>`).join("");
+  // weekly chart (last 12 weeks, Mon-based)
+  const weeks = [];
+  const monday = d => { const x = new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; };
+  let w = monday(new Date());
+  for(let i=0;i<12;i++){ weeks.unshift(new Date(w)); w = new Date(w - 7*86400000); }
+  const sums = weeks.map(ws=>{
+    const we = new Date(+ws + 7*86400000);
+    return runs.filter(r=>{ const d=new Date(r.date+"T12:00:00"); return d>=ws && d<we; }).reduce((s,r)=>s+r.km,0);
+  });
+  const max = Math.max(...sums, 1);
+  document.getElementById("week-chart").innerHTML = weeks.map((ws,i)=>`
+    <div class="col">
+      <div class="val">${sums[i]? sums[i].toFixed(0):""}</div>
+      <div class="bar" style="height:${Math.max(2, sums[i]/max*82)}px"></div>
+      <div class="lbl">${ws.getDate()}.${ws.getMonth()+1}</div>
+    </div>`).join("");
+  // table
+  document.getElementById("run-table").querySelector("tbody").innerHTML = runs.map(r=>`
+    <tr>
+      <td>${fmtDate(r.date)}</td>
+      <td><b>${r.km.toFixed(2)}</b></td>
+      <td>${fmtDur(r.sec)}</td>
+      <td class="accent-g">${fmtPace(r.sec/r.km)}</td>
+      <td class="note-txt">${esc(r.note)}</td>
+      <td><button class="del" title="delete" onclick="delRun('${r.id}')">✕</button></td>
+    </tr>`).join("");
+  document.getElementById("run-empty").style.display = runs.length? "none":"block";
+}
+
+/* ---------- AGENCY ---------- */
+function addLead(e){
+  e.preventDefault();
+  db.leads.push({id:uid(), name:document.getElementById("l-name").value.trim(),
+    contact:document.getElementById("l-contact").value.trim(),
+    value:parseFloat(document.getElementById("l-value").value)||0,
+    notes:document.getElementById("l-notes").value.trim(),
+    status:"To contact", created:today()});
+  save(); e.target.reset(); renderAgency();
+}
+function delLead(id){ db.leads = db.leads.filter(l=>l.id!==id); save(); renderAgency(); }
+function setLeadStatus(id,s){ const l=db.leads.find(x=>x.id===id); if(l){ l.status=s; save(); renderAgency(); } }
+function addTask(e){
+  e.preventDefault();
+  db.tasks.push({id:uid(), text:document.getElementById("t-text").value.trim(), done:false});
+  save(); e.target.reset(); renderAgency();
+}
+function toggleTask(id){ const t=db.tasks.find(x=>x.id===id); if(t){ t.done=!t.done; save(); renderAgency(); } }
+function delTask(id){ db.tasks = db.tasks.filter(t=>t.id!==id); save(); renderAgency(); }
+
+function renderAgency(){
+  const L = db.leads;
+  const won = L.filter(l=>l.status==="Won");
+  const active = L.filter(l=>!["Won","Lost"].includes(l.status));
+  const contacted = L.filter(l=>l.status!=="To contact").length;
+  document.getElementById("agency-stats").innerHTML = [
+    ["Leads", L.length],
+    ["Contacted", contacted],
+    ["In progress", active.filter(l=>l.status!=="To contact").length],
+    ["Customers won", won.length],
+    ["Revenue", eur(won.reduce((s,l)=>s+(+l.value||0),0))],
+    ["Open tasks", db.tasks.filter(t=>!t.done).length],
+  ].map(([l,v])=>`<div class="card stat"><div class="label">${l}</div><div class="value accent-a">${v}</div></div>`).join("");
+
+  document.getElementById("pipe-summary").innerHTML = STATUSES.map(s=>{
+    const n = L.filter(l=>l.status===s).length;
+    return `<span class="chip" style="border-color:${n?STATUS_COLOR[s]+'55':'var(--line)'}"><b style="color:${STATUS_COLOR[s]}">${n}</b> ${s}</span>`;
+  }).join("");
+
+  const order = s => STATUSES.indexOf(s);
+  const rows = [...L].sort((a,b)=> order(a.status)-order(b.status) || b.created.localeCompare(a.created));
+  document.getElementById("lead-table").querySelector("tbody").innerHTML = rows.map(l=>`
+    <tr class="lead-row">
+      <td><div class="lead-name">${esc(l.name)}</div><div class="lead-meta">${esc(l.contact)}</div></td>
+      <td>
+        <select onchange="setLeadStatus('${l.id}', this.value)" style="color:${STATUS_COLOR[l.status]}">
+          ${STATUSES.map(s=>`<option ${s===l.status?"selected":""}>${s}</option>`).join("")}
+        </select>
+      </td>
+      <td>${l.value? eur(l.value):"—"}</td>
+      <td class="note-txt">${esc(l.notes)}</td>
+      <td><button class="del" title="delete" onclick="delLead('${l.id}')">✕</button></td>
+    </tr>`).join("");
+  document.getElementById("lead-empty").style.display = L.length? "none":"block";
+
+  document.getElementById("task-list").innerHTML = db.tasks.map(t=>`
+    <li class="${t.done?'done':''}">
+      <input type="checkbox" ${t.done?"checked":""} onchange="toggleTask('${t.id}')">
+      <span>${esc(t.text)}</span>
+      <button class="del" onclick="delTask('${t.id}')">✕</button>
+    </li>`).join("");
+  document.getElementById("task-empty").style.display = db.tasks.length? "none":"block";
+}
+
+/* ---------- export / import ---------- */
+function exportData(){
+  const blob = new Blob([JSON.stringify(db,null,2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "beshr-hq-backup-" + today() + ".json";
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function importData(input){
+  const f = input.files[0]; if(!f) return;
+  f.text().then(txt=>{
+    try{
+      const d = JSON.parse(txt);
+      if(!d || !Array.isArray(d.runs) || !Array.isArray(d.leads)) throw 0;
+      db = sanitize(d);
+      save(); renderRuns(); renderAgency();
+      alert("Backup imported ✔");
+    }catch(e){ alert("That file doesn't look like a Beshr HQ backup."); }
+  });
+  input.value = "";
+}
+
+/* ---------- init ---------- */
+document.getElementById("r-date").value = today();
+renderRuns(); renderAgency();
+showTab(localStorage.getItem(KEY+"-tab") || "runs");
+
+/* ---------- PWA: offline support (only when served over http/https) ---------- */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  navigator.serviceWorker.register("./sw.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
