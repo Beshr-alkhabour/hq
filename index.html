@@ -67,6 +67,18 @@
   .bar-outer{background:var(--card2);border-radius:999px;height:10px;overflow:hidden;margin-top:8px}
   .bar-inner{height:100%;background:linear-gradient(90deg,#22c55e,#4ade80);border-radius:999px;transition:width .4s}
 
+  .grid.two{grid-template-columns:1fr 1fr;margin-bottom:14px}
+  .gym-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .gym-dots{display:flex;gap:7px}
+  .dot{width:30px;height:30px;border-radius:50%;background:var(--card2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.62rem;color:var(--faint);cursor:pointer;user-select:none}
+  .dot.on{background:var(--green-dim);border-color:var(--green);color:var(--green);font-weight:700}
+  .dot.future{opacity:.35;cursor:default}
+  .gym-stats{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:.82rem}
+  .gym-stats b{color:var(--green);font-size:1.05rem}
+  .next-inp{width:132px;padding:6px 8px;font-size:.8rem}
+  .next-inp.overdue{border-color:var(--red);color:var(--red)}
+  .chip.warn{border-color:rgba(248,113,113,.5)!important;color:var(--red)!important}
+
   .chart{display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:8px}
   .chart .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
   .chart .bar{width:100%;max-width:34px;background:linear-gradient(180deg,#4ade80,#15803d);border-radius:6px 6px 2px 2px;min-height:2px}
@@ -99,7 +111,7 @@
   .empty{color:var(--faint);font-size:.86rem;padding:14px 4px;text-align:center}
   footer{margin-top:36px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--faint);font-size:.76rem}
   footer .io{display:flex;gap:8px}
-  @media(max-width:560px){ .race .big{font-size:1.5rem} }
+  @media(max-width:560px){ .race .big{font-size:1.5rem} .grid.two{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -135,7 +147,36 @@
       </div>
     </div>
 
+    <div class="grid two">
+      <div class="card stat">
+        <div class="label">This week's plan</div>
+        <div class="value accent-g" id="wk-target">—</div>
+        <div class="sub" id="wk-detail"></div>
+        <div class="bar-outer"><div class="bar-inner" id="wk-bar" style="width:0%"></div></div>
+        <div class="sub" id="wk-done" style="margin-top:5px"></div>
+      </div>
+      <div class="card stat">
+        <div class="label">🎓 Matura — goal #1</div>
+        <div class="value accent-a" id="matura-days">—</div>
+        <div class="sub">days until the exams</div>
+        <input type="date" id="matura-date" style="margin-top:8px;max-width:170px" onchange="setMaturaDate(this.value)">
+      </div>
+    </div>
+
     <div class="grid stats" id="run-stats"></div>
+
+    <h2>Gym <small>rebuild the habit — tap a day to toggle</small></h2>
+    <div class="card">
+      <div class="gym-row">
+        <button class="btn btn-g" onclick="toggleGymToday()">I was at the gym today 💪</button>
+        <div class="gym-dots" id="gym-dots"></div>
+        <div class="gym-stats">
+          <span><b id="gym-week">0</b> this week</span>
+          <span><b id="gym-streak">0</b> week streak (2+ visits)</span>
+          <span><b id="gym-month">0</b> last 30 days</span>
+        </div>
+      </div>
+    </div>
 
     <h2>Add a run</h2>
     <div class="card">
@@ -152,7 +193,7 @@
     <div class="card"><div class="chart" id="week-chart"></div></div>
 
     <h2>Run log</h2>
-    <div class="card" style="padding:6px 10px">
+    <div class="card" style="padding:6px 10px;overflow-x:auto">
       <table id="run-table">
         <thead><tr><th>Date</th><th>Km</th><th>Time</th><th>Pace</th><th>Note</th><th></th></tr></thead>
         <tbody></tbody>
@@ -172,15 +213,16 @@
         <div class="field"><label>Contact</label><input type="text" id="l-contact" placeholder="owner name / phone"></div>
         <div class="field"><label>Value (€)</label><input type="number" id="l-value" min="0" step="50" placeholder="800"></div>
         <div class="field grow"><label>Notes</label><input type="text" id="l-notes" placeholder="no website yet, spoke to owner briefly"></div>
+        <div class="field"><label>Follow-up on</label><input type="date" id="l-next"></div>
         <button class="btn btn-a" type="submit">Add lead</button>
       </form>
     </div>
 
     <div style="height:12px"></div>
     <div class="pipeline-summary" id="pipe-summary"></div>
-    <div class="card" style="padding:6px 10px">
+    <div class="card" style="padding:6px 10px;overflow-x:auto">
       <table id="lead-table">
-        <thead><tr><th>Shop</th><th>Status</th><th>Value</th><th>Notes</th><th></th></tr></thead>
+        <thead><tr><th>Shop</th><th>Status</th><th>Follow-up</th><th>Value</th><th>Notes</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
       <div class="empty" id="lead-empty">
@@ -223,7 +265,7 @@ const sStr  = v => typeof v === "string" ? v.slice(0,500) : "";
 const sNum  = v => { const n = parseFloat(v); return isFinite(n) && n >= 0 ? n : 0; };
 const sDate = v => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) ? v : "";
 function sanitize(d){
-  const out = {runs:[],leads:[],tasks:[],settings:{raceDate:"2027-04-11"}};
+  const out = {runs:[],leads:[],tasks:[],gym:[],settings:{raceDate:"2027-04-11",maturaDate:"2026-10-01"}};
   if(!d || typeof d !== "object") return out;
   if(Array.isArray(d.runs)) out.runs = d.runs
     .map(r => ({id:uid(), date:sDate(r?.date), km:sNum(r?.km), sec:sNum(r?.sec), note:sStr(r?.note)}))
@@ -231,13 +273,16 @@ function sanitize(d){
   if(Array.isArray(d.leads)) out.leads = d.leads
     .map(l => ({id:uid(), name:sStr(l?.name), contact:sStr(l?.contact), value:sNum(l?.value),
                 notes:sStr(l?.notes), status:STATUSES.includes(l?.status) ? l.status : "To contact",
-                created:sDate(l?.created) || "1970-01-01"}))
+                next:sDate(l?.next), created:sDate(l?.created) || "1970-01-01"}))
     .filter(l => l.name);
   if(Array.isArray(d.tasks)) out.tasks = d.tasks
     .map(t => ({id:uid(), text:sStr(t?.text), done:!!t?.done}))
     .filter(t => t.text);
+  if(Array.isArray(d.gym)) out.gym = [...new Set(d.gym.map(sDate).filter(Boolean))];
   const rd = sDate(d.settings && d.settings.raceDate);
   if(rd) out.settings.raceDate = rd;
+  const md = sDate(d.settings && d.settings.maturaDate);
+  if(md) out.settings.maturaDate = md;
   return out;
 }
 let db = load();
@@ -294,6 +339,51 @@ function delRun(id){ db.runs = db.runs.filter(r=>r.id!==id); save(); renderRuns(
 function isoLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function today(){ return isoLocal(new Date()); }
 function setRaceDate(v){ if(v){ db.settings.raceDate = v; save(); renderRuns(); } }
+function setMaturaDate(v){ if(v){ db.settings.maturaDate = v; save(); renderRuns(); } }
+const monday = d => { const x = new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; };
+
+/* progressive half-marathon plan: weekly km target from weeks-until-race */
+function weekTarget(w){
+  if(w <= 0)  return {km:21.1, long:21.1, label:"Race week — you've got this"};
+  if(w === 1) return {km:15,   long:8,    label:"Taper — stay fresh"};
+  if(w === 2) return {km:24,   long:12,   label:"Taper begins"};
+  if(w > 30)  return {km:12,   long:6,    label:"Base building"};
+  const t = (30 - w) / 27;                       // ramp from week 30 → week 3
+  let km = 12 + (38 - 12) * t, label = "Build";
+  if(w % 4 === 0){ km *= 0.8; label = "Recovery week"; }
+  return {km:Math.round(km), long:Math.min(18, Math.max(5, Math.round(km*0.45))), label};
+}
+
+/* ---------- GYM ---------- */
+function toggleGymDate(ds){
+  const i = db.gym.indexOf(ds);
+  if(i >= 0) db.gym.splice(i,1); else db.gym.push(ds);
+  save(); renderGym();
+}
+function toggleGymToday(){ toggleGymDate(today()); }
+function renderGym(){
+  const now = new Date(), mon = monday(now), t = today();
+  const names = ["M","T","W","T","F","S","S"];
+  let dots = "";
+  for(let i=0;i<7;i++){
+    const d = new Date(+mon + i*86400000), ds = isoLocal(d);
+    const future = ds > t;
+    dots += `<div class="dot ${db.gym.includes(ds)?"on":""} ${future?"future":""}"
+                  ${future?"":`onclick="toggleGymDate('${ds}')"`} title="${ds}">${names[i]}</div>`;
+  }
+  document.getElementById("gym-dots").innerHTML = dots;
+  const wkCount = ws => { const we = new Date(+ws + 7*86400000);
+    return db.gym.filter(g => { const d = new Date(g+"T12:00:00"); return d >= ws && d < we; }).length; };
+  document.getElementById("gym-week").textContent = wkCount(mon);
+  const moAgo = isoLocal(new Date(now - 30*86400000));
+  document.getElementById("gym-month").textContent = db.gym.filter(g => g >= moAgo).length;
+  // consecutive weeks with >= 2 visits (current week counts if already >= 2, otherwise grace)
+  let streak = 0, w = mon;
+  if(wkCount(w) >= 2){ streak = 1; }
+  w = new Date(+w - 7*86400000);
+  while(wkCount(w) >= 2){ streak++; w = new Date(+w - 7*86400000); }
+  document.getElementById("gym-streak").textContent = streak;
+}
 
 function renderRuns(){
   const runs = [...db.runs].sort((a,b)=> b.date.localeCompare(a.date));
@@ -301,6 +391,21 @@ function renderRuns(){
   document.getElementById("race-date").value = db.settings.raceDate;
   const days = Math.ceil((new Date(db.settings.raceDate) - new Date())/86400000);
   document.getElementById("race-days").textContent = days > 0 ? days : (days===0 ? "TODAY" : "done");
+  // matura countdown
+  document.getElementById("matura-date").value = db.settings.maturaDate;
+  const mDays = Math.ceil((new Date(db.settings.maturaDate) - new Date())/86400000);
+  document.getElementById("matura-days").textContent = mDays > 0 ? mDays : (mDays===0 ? "TODAY" : "done 🎉");
+  // this week's plan
+  const monThis = monday(new Date());
+  const weeksToRace = Math.max(0, Math.floor((new Date(db.settings.raceDate) - monThis)/(7*86400000)));
+  const tgt = weekTarget(weeksToRace);
+  const wkDone = db.runs.filter(r => { const d = new Date(r.date+"T12:00:00"); return d >= monThis; })
+                        .reduce((s,r)=>s+r.km,0);
+  document.getElementById("wk-target").textContent = tgt.km + " km";
+  document.getElementById("wk-detail").textContent = tgt.label + " · longest run " + tgt.long + " km";
+  document.getElementById("wk-bar").style.width = Math.min(100, wkDone/tgt.km*100).toFixed(1) + "%";
+  document.getElementById("wk-done").textContent = wkDone.toFixed(1) + " of " + tgt.km + " km done this week";
+  renderGym();
   // HM progress
   const longest = runs.length ? Math.max(...runs.map(r=>r.km)) : 0;
   const pct = Math.min(100, longest/21.1*100);
@@ -325,7 +430,6 @@ function renderRuns(){
   ].map(([l,v])=>`<div class="card stat"><div class="label">${l}</div><div class="value accent-g">${v}</div></div>`).join("");
   // weekly chart (last 12 weeks, Mon-based)
   const weeks = [];
-  const monday = d => { const x = new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; };
   let w = monday(new Date());
   for(let i=0;i<12;i++){ weeks.unshift(new Date(w)); w = new Date(w - 7*86400000); }
   const sums = weeks.map(ws=>{
@@ -359,11 +463,14 @@ function addLead(e){
     contact:document.getElementById("l-contact").value.trim(),
     value:parseFloat(document.getElementById("l-value").value)||0,
     notes:document.getElementById("l-notes").value.trim(),
+    next:document.getElementById("l-next").value || "",
     status:"To contact", created:today()});
   save(); e.target.reset(); renderAgency();
 }
 function delLead(id){ db.leads = db.leads.filter(l=>l.id!==id); save(); renderAgency(); }
 function setLeadStatus(id,s){ const l=db.leads.find(x=>x.id===id); if(l){ l.status=s; save(); renderAgency(); } }
+function setLeadNext(id,v){ const l=db.leads.find(x=>x.id===id); if(l){ l.next = sDate(v); save(); renderAgency(); } }
+const isOverdue = l => l.next && l.next < today() && !["Won","Lost"].includes(l.status);
 function addTask(e){
   e.preventDefault();
   db.tasks.push({id:uid(), text:document.getElementById("t-text").value.trim(), done:false});
@@ -386,13 +493,16 @@ function renderAgency(){
     ["Open tasks", db.tasks.filter(t=>!t.done).length],
   ].map(([l,v])=>`<div class="card stat"><div class="label">${l}</div><div class="value accent-a">${v}</div></div>`).join("");
 
-  document.getElementById("pipe-summary").innerHTML = STATUSES.map(s=>{
-    const n = L.filter(l=>l.status===s).length;
-    return `<span class="chip" style="border-color:${n?STATUS_COLOR[s]+'55':'var(--line)'}"><b style="color:${STATUS_COLOR[s]}">${n}</b> ${s}</span>`;
-  }).join("");
+  const nOverdue = L.filter(isOverdue).length;
+  document.getElementById("pipe-summary").innerHTML =
+    (nOverdue ? `<span class="chip warn"><b style="color:var(--red)">⚠ ${nOverdue}</b> follow-up${nOverdue>1?"s":""} overdue</span>` : "") +
+    STATUSES.map(s=>{
+      const n = L.filter(l=>l.status===s).length;
+      return `<span class="chip" style="border-color:${n?STATUS_COLOR[s]+'55':'var(--line)'}"><b style="color:${STATUS_COLOR[s]}">${n}</b> ${s}</span>`;
+    }).join("");
 
   const order = s => STATUSES.indexOf(s);
-  const rows = [...L].sort((a,b)=> order(a.status)-order(b.status) || b.created.localeCompare(a.created));
+  const rows = [...L].sort((a,b)=> (isOverdue(b)-isOverdue(a)) || order(a.status)-order(b.status) || b.created.localeCompare(a.created));
   document.getElementById("lead-table").querySelector("tbody").innerHTML = rows.map(l=>`
     <tr class="lead-row">
       <td><div class="lead-name">${esc(l.name)}</div><div class="lead-meta">${esc(l.contact)}</div></td>
@@ -401,6 +511,8 @@ function renderAgency(){
           ${STATUSES.map(s=>`<option ${s===l.status?"selected":""}>${s}</option>`).join("")}
         </select>
       </td>
+      <td><input type="date" class="next-inp ${isOverdue(l)?"overdue":""}" value="${l.next||""}"
+                 onchange="setLeadNext('${l.id}', this.value)"></td>
       <td>${l.value? eur(l.value):"—"}</td>
       <td class="note-txt">${esc(l.notes)}</td>
       <td><button class="del" title="delete" onclick="delLead('${l.id}')">✕</button></td>
