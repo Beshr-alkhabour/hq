@@ -33,6 +33,12 @@
   .tabs button.active-runs{background:var(--green-dim);color:var(--green)}
   .tabs button.active-agency{background:var(--amber-dim);color:var(--amber)}
   .tabs button.active-today{background:rgba(96,165,250,.14);color:var(--blue)}
+  .tabs button.active-money{background:rgba(192,132,252,.14);color:#c084fc}
+  .accent-p{color:#c084fc}
+  .pay-btn{background:none;border:1px solid var(--line);color:var(--muted);border-radius:7px;padding:4px 10px;font-size:.75rem;cursor:pointer}
+  .pay-btn:hover{border-color:#c084fc;color:#c084fc}
+  tr.settled td{opacity:.45}
+  tr.settled .lead-name{text-decoration:line-through}
   .accent-b{color:var(--blue)}
   .today-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
   .today-head .date{font-size:1.05rem;font-weight:700}
@@ -131,6 +137,7 @@
       <button id="tab-today" onclick="showTab('today')">📋 Today</button>
       <button id="tab-runs" onclick="showTab('runs')">🏃 Runs</button>
       <button id="tab-agency" onclick="showTab('agency')">💼 Agency</button>
+      <button id="tab-money" onclick="showTab('money')">💶 Money</button>
     </nav>
   </header>
 
@@ -265,6 +272,32 @@
     </div>
   </section>
 
+  <!-- ================= MONEY ================= -->
+  <section id="sec-money">
+    <div class="grid stats" id="money-stats"></div>
+
+    <h2>Lend money <small>track who owes you what</small></h2>
+    <div class="card">
+      <form class="row" onsubmit="addLoan(event)">
+        <div class="field grow"><label>Person</label><input type="text" id="m-person" placeholder="Amjad" required></div>
+        <div class="field"><label>Amount (€)</label><input type="number" id="m-amount" min="0.01" step="0.01" placeholder="50" required></div>
+        <div class="field"><label>Date</label><input type="date" id="m-date" required></div>
+        <div class="field grow"><label>Note (optional)</label><input type="text" id="m-note" placeholder="shisha evening, paid for him"></div>
+        <button class="btn" type="submit" style="background:#c084fc;color:#2a1040">Add loan</button>
+      </form>
+    </div>
+
+    <div style="height:12px"></div>
+    <div class="pipeline-summary" id="money-summary"></div>
+    <div class="card" style="padding:6px 10px;overflow-x:auto">
+      <table id="loan-table">
+        <thead><tr><th>Person</th><th>Date</th><th>Lent</th><th>Repaid</th><th>Open</th><th>Note</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="loan-empty">No loans tracked yet. Add one above — or import your Excel history via a backup file.</div>
+    </div>
+  </section>
+
   <footer>
     <span>Data is saved locally in this browser (localStorage) — nothing leaves your computer.</span>
     <span class="io">
@@ -288,7 +321,7 @@ const sStr  = v => typeof v === "string" ? v.slice(0,500) : "";
 const sNum  = v => { const n = parseFloat(v); return isFinite(n) && n >= 0 ? n : 0; };
 const sDate = v => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) ? v : "";
 function sanitize(d){
-  const out = {runs:[],leads:[],tasks:[],gym:[],todos:[],settings:{raceDate:"2027-04-11",maturaDate:"2026-10-01"}};
+  const out = {runs:[],leads:[],tasks:[],gym:[],todos:[],loans:[],settings:{raceDate:"2027-04-11",maturaDate:"2026-10-01"}};
   if(!d || typeof d !== "object") return out;
   if(Array.isArray(d.runs)) out.runs = d.runs
     .map(r => ({id:uid(), date:sDate(r?.date), km:sNum(r?.km), sec:sNum(r?.sec), note:sStr(r?.note)}))
@@ -305,6 +338,11 @@ function sanitize(d){
   if(Array.isArray(d.todos)) out.todos = d.todos
     .map(t => ({id:uid(), text:sStr(t?.text), done:!!t?.done, doneDate:sDate(t?.doneDate)}))
     .filter(t => t.text);
+  if(Array.isArray(d.loans)) out.loans = d.loans
+    .map(l => ({id:uid(), person:sStr(l?.person), amount:sNum(l?.amount),
+                repaid:Math.min(sNum(l?.repaid), sNum(l?.amount)),
+                date:sDate(l?.date) || "1970-01-01", note:sStr(l?.note)}))
+    .filter(l => l.person && l.amount > 0);
   const rd = sDate(d.settings && d.settings.raceDate);
   if(rd) out.settings.raceDate = rd;
   const md = sDate(d.settings && d.settings.maturaDate);
@@ -324,9 +362,11 @@ function showTab(t){
   document.getElementById("sec-today").classList.toggle("visible", t==="today");
   document.getElementById("sec-runs").classList.toggle("visible", t==="runs");
   document.getElementById("sec-agency").classList.toggle("visible", t==="agency");
+  document.getElementById("sec-money").classList.toggle("visible", t==="money");
   document.getElementById("tab-today").className = t==="today" ? "active-today" : "";
   document.getElementById("tab-runs").className = t==="runs" ? "active-runs" : "";
   document.getElementById("tab-agency").className = t==="agency" ? "active-agency" : "";
+  document.getElementById("tab-money").className = t==="money" ? "active-money" : "";
   localStorage.setItem(KEY+"-tab", t);
 }
 
@@ -594,6 +634,74 @@ function renderAgency(){
   document.getElementById("task-empty").style.display = db.tasks.length? "none":"block";
 }
 
+/* ---------- MONEY (loans to friends) ---------- */
+const loanOpen = l => Math.max(0, l.amount - l.repaid);
+function addLoan(e){
+  e.preventDefault();
+  db.loans.push({id:uid(), person:document.getElementById("m-person").value.trim(),
+    amount:parseFloat(document.getElementById("m-amount").value)||0,
+    repaid:0, date:document.getElementById("m-date").value,
+    note:document.getElementById("m-note").value.trim()});
+  save(); e.target.reset(); document.getElementById("m-date").value = today();
+  renderMoney();
+}
+function addRepayment(id){
+  const l = db.loans.find(x=>x.id===id); if(!l) return;
+  const open = loanOpen(l);
+  const v = prompt(`How much did ${l.person} pay back? (€${open.toFixed(2)} still open)`, open.toFixed(2));
+  if(v === null) return;
+  const n = parseFloat(String(v).replace(",", "."));
+  if(!isFinite(n) || n <= 0){ alert("Please enter a valid amount."); return; }
+  l.repaid = Math.min(l.amount, l.repaid + n);
+  save(); renderMoney();
+}
+function settleLoan(id){
+  const l = db.loans.find(x=>x.id===id); if(!l) return;
+  l.repaid = l.amount; save(); renderMoney();
+}
+function delLoan(id){
+  const l = db.loans.find(x=>x.id===id); if(!l) return;
+  if(!confirm(`Delete the loan to ${l.person} (${eur(l.amount)} from ${fmtDate(l.date)})?\n\nThis cannot be undone.`)) return;
+  db.loans = db.loans.filter(x=>x.id!==id); save(); renderMoney();
+}
+function renderMoney(){
+  const L = db.loans;
+  const open = L.filter(l => loanOpen(l) > 0.004);
+  const totalOpen = open.reduce((s,l)=>s+loanOpen(l),0);
+  const totalLent = L.reduce((s,l)=>s+l.amount,0);
+  const totalRepaid = L.reduce((s,l)=>s+l.repaid,0);
+  const people = {};
+  open.forEach(l => people[l.person] = (people[l.person]||0) + loanOpen(l));
+  document.getElementById("money-stats").innerHTML = [
+    ["Open (owed to you)", "€" + totalOpen.toFixed(2)],
+    ["People owing", Object.keys(people).length],
+    ["Lent all time", "€" + totalLent.toFixed(2)],
+    ["Repaid all time", "€" + totalRepaid.toFixed(2)],
+  ].map(([l,v])=>`<div class="card stat"><div class="label">${l}</div><div class="value accent-p">${v}</div></div>`).join("");
+  document.getElementById("money-summary").innerHTML = Object.entries(people)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([p,v])=>`<span class="chip"><b style="color:#c084fc">€${v.toFixed(2)}</b> ${esc(p)}</span>`).join("");
+  const rows = [...L].sort((a,b)=> (loanOpen(b)>0.004)-(loanOpen(a)>0.004)
+      || a.person.localeCompare(b.person) || b.date.localeCompare(a.date));
+  document.getElementById("loan-table").querySelector("tbody").innerHTML = rows.map(l=>{
+    const o = loanOpen(l), settled = o <= 0.004;
+    return `<tr class="${settled?"settled":""}">
+      <td><div class="lead-name">${esc(l.person)}</div></td>
+      <td>${fmtDate(l.date)}</td>
+      <td>${eur(l.amount)}</td>
+      <td>${l.repaid ? eur(l.repaid) : "—"}</td>
+      <td><b class="${settled?"":"accent-p"}">${settled ? "✓" : eur(o)}</b></td>
+      <td class="note-txt">${esc(l.note)}</td>
+      <td style="white-space:nowrap">
+        ${settled ? "" : `<button class="pay-btn" onclick="addRepayment('${l.id}')">+ payment</button>
+        <button class="pay-btn" onclick="settleLoan('${l.id}')" title="mark fully repaid">✓ paid</button>`}
+        <button class="del" title="delete" onclick="delLoan('${l.id}')">✕</button>
+      </td>
+    </tr>`;
+  }).join("");
+  document.getElementById("loan-empty").style.display = L.length ? "none" : "block";
+}
+
 /* ---------- export / import ---------- */
 function exportData(){
   const blob = new Blob([JSON.stringify(db,null,2)], {type:"application/json"});
@@ -618,7 +726,8 @@ function importData(input){
 
 /* ---------- init ---------- */
 document.getElementById("r-date").value = today();
-renderToday(); renderRuns(); renderAgency();
+document.getElementById("m-date").value = today();
+renderToday(); renderRuns(); renderAgency(); renderMoney();
 showTab(localStorage.getItem(KEY+"-tab") || "today");
 
 /* ---------- PWA: offline support (only when served over http/https) ---------- */
