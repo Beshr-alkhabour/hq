@@ -32,6 +32,11 @@
   .tabs button{border:0;background:transparent;color:var(--muted);padding:9px 20px;border-radius:999px;font-size:.95rem;font-weight:600;cursor:pointer;transition:.15s}
   .tabs button.active-runs{background:var(--green-dim);color:var(--green)}
   .tabs button.active-agency{background:var(--amber-dim);color:var(--amber)}
+  .tabs button.active-today{background:rgba(96,165,250,.14);color:var(--blue)}
+  .accent-b{color:var(--blue)}
+  .today-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .today-head .date{font-size:1.05rem;font-weight:700}
+  .today-head .sub{color:var(--muted);font-size:.82rem}
 
   section{display:none}
   section.visible{display:block}
@@ -123,10 +128,36 @@
       <p>Runs &amp; Luminary Studio — everything in one place</p>
     </div>
     <nav class="tabs">
+      <button id="tab-today" onclick="showTab('today')">📋 Today</button>
       <button id="tab-runs" onclick="showTab('runs')">🏃 Runs</button>
       <button id="tab-agency" onclick="showTab('agency')">💼 Agency</button>
     </nav>
   </header>
+
+  <!-- ================= TODAY ================= -->
+  <section id="sec-today">
+    <div class="today-head">
+      <div>
+        <div class="date" id="today-date">—</div>
+        <div class="sub">unfinished to-dos carry over · completed ones clear overnight</div>
+      </div>
+      <div class="card stat" style="padding:12px 18px">
+        <div class="label">🎓 Matura — goal #1</div>
+        <div class="value accent-a" id="matura-days">—</div>
+        <div class="sub">days to go · <input type="date" id="matura-date" style="width:auto;padding:4px 6px;font-size:.78rem" onchange="setMaturaDate(this.value)"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <form class="row" onsubmit="addTodo(event)">
+        <div class="field grow"><label>What do you need to do?</label>
+          <input type="text" id="td-text" placeholder="e.g. book VCM ticket, study Mathe chapter 4" required></div>
+        <button class="btn" type="submit" style="background:var(--blue);color:#0a1a2e">Add</button>
+      </form>
+      <ul class="tasks" id="todo-list"></ul>
+      <div class="empty" id="todo-empty">Nothing on the list. Add what you must do — unfinished items stay until you check them off.</div>
+    </div>
+  </section>
 
   <!-- ================= RUNS ================= -->
   <section id="sec-runs">
@@ -147,20 +178,12 @@
       </div>
     </div>
 
-    <div class="grid two">
-      <div class="card stat">
-        <div class="label">This week's plan</div>
-        <div class="value accent-g" id="wk-target">—</div>
-        <div class="sub" id="wk-detail"></div>
-        <div class="bar-outer"><div class="bar-inner" id="wk-bar" style="width:0%"></div></div>
-        <div class="sub" id="wk-done" style="margin-top:5px"></div>
-      </div>
-      <div class="card stat">
-        <div class="label">🎓 Matura — goal #1</div>
-        <div class="value accent-a" id="matura-days">—</div>
-        <div class="sub">days until the exams</div>
-        <input type="date" id="matura-date" style="margin-top:8px;max-width:170px" onchange="setMaturaDate(this.value)">
-      </div>
+    <div class="card stat" style="margin-bottom:14px">
+      <div class="label">This week's plan</div>
+      <div class="value accent-g" id="wk-target">—</div>
+      <div class="sub" id="wk-detail"></div>
+      <div class="bar-outer"><div class="bar-inner" id="wk-bar" style="width:0%"></div></div>
+      <div class="sub" id="wk-done" style="margin-top:5px"></div>
     </div>
 
     <div class="grid stats" id="run-stats"></div>
@@ -265,7 +288,7 @@ const sStr  = v => typeof v === "string" ? v.slice(0,500) : "";
 const sNum  = v => { const n = parseFloat(v); return isFinite(n) && n >= 0 ? n : 0; };
 const sDate = v => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) ? v : "";
 function sanitize(d){
-  const out = {runs:[],leads:[],tasks:[],gym:[],settings:{raceDate:"2027-04-11",maturaDate:"2026-10-01"}};
+  const out = {runs:[],leads:[],tasks:[],gym:[],todos:[],settings:{raceDate:"2027-04-11",maturaDate:"2026-10-01"}};
   if(!d || typeof d !== "object") return out;
   if(Array.isArray(d.runs)) out.runs = d.runs
     .map(r => ({id:uid(), date:sDate(r?.date), km:sNum(r?.km), sec:sNum(r?.sec), note:sStr(r?.note)}))
@@ -279,6 +302,9 @@ function sanitize(d){
     .map(t => ({id:uid(), text:sStr(t?.text), done:!!t?.done}))
     .filter(t => t.text);
   if(Array.isArray(d.gym)) out.gym = [...new Set(d.gym.map(sDate).filter(Boolean))];
+  if(Array.isArray(d.todos)) out.todos = d.todos
+    .map(t => ({id:uid(), text:sStr(t?.text), done:!!t?.done, doneDate:sDate(t?.doneDate)}))
+    .filter(t => t.text);
   const rd = sDate(d.settings && d.settings.raceDate);
   if(rd) out.settings.raceDate = rd;
   const md = sDate(d.settings && d.settings.maturaDate);
@@ -295,8 +321,10 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 
 /* ---------- tabs ---------- */
 function showTab(t){
+  document.getElementById("sec-today").classList.toggle("visible", t==="today");
   document.getElementById("sec-runs").classList.toggle("visible", t==="runs");
   document.getElementById("sec-agency").classList.toggle("visible", t==="agency");
+  document.getElementById("tab-today").className = t==="today" ? "active-today" : "";
   document.getElementById("tab-runs").className = t==="runs" ? "active-runs" : "";
   document.getElementById("tab-agency").className = t==="agency" ? "active-agency" : "";
   localStorage.setItem(KEY+"-tab", t);
@@ -335,11 +363,48 @@ function addRun(e){
   save(); e.target.reset(); document.getElementById("r-date").value = today();
   renderRuns();
 }
-function delRun(id){ db.runs = db.runs.filter(r=>r.id!==id); save(); renderRuns(); }
+function delRun(id){
+  const r = db.runs.find(x=>x.id===id);
+  if(!r) return;
+  if(!confirm(`Delete this run?\n\n${fmtDate(r.date)} — ${r.km.toFixed(2)} km in ${fmtDur(r.sec)}\n\nThis cannot be undone.`)) return;
+  db.runs = db.runs.filter(x=>x.id!==id); save(); renderRuns();
+}
 function isoLocal(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function today(){ return isoLocal(new Date()); }
 function setRaceDate(v){ if(v){ db.settings.raceDate = v; save(); renderRuns(); } }
-function setMaturaDate(v){ if(v){ db.settings.maturaDate = v; save(); renderRuns(); } }
+function setMaturaDate(v){ if(v){ db.settings.maturaDate = v; save(); renderToday(); } }
+
+/* ---------- TODAY (daily to-dos) ---------- */
+function addTodo(e){
+  e.preventDefault();
+  db.todos.push({id:uid(), text:document.getElementById("td-text").value.trim(), done:false, doneDate:""});
+  save(); e.target.reset(); renderToday();
+}
+function toggleTodo(id){
+  const t = db.todos.find(x=>x.id===id);
+  if(t){ t.done = !t.done; t.doneDate = t.done ? today() : ""; save(); renderToday(); }
+}
+function delTodo(id){ db.todos = db.todos.filter(t=>t.id!==id); save(); renderToday(); }
+function renderToday(){
+  document.getElementById("today-date").textContent =
+    new Date().toLocaleDateString("en-GB", {weekday:"long", day:"numeric", month:"long"});
+  // matura countdown
+  document.getElementById("matura-date").value = db.settings.maturaDate;
+  const mDays = Math.ceil((new Date(db.settings.maturaDate) - new Date())/86400000);
+  document.getElementById("matura-days").textContent = mDays > 0 ? mDays : (mDays===0 ? "TODAY" : "done 🎉");
+  // items checked off before today disappear; unfinished ones carry over
+  const t = today(), n = db.todos.length;
+  db.todos = db.todos.filter(x => !(x.done && x.doneDate && x.doneDate < t));
+  if(db.todos.length !== n) save();
+  const open = db.todos.filter(x=>!x.done), done = db.todos.filter(x=>x.done);
+  document.getElementById("todo-list").innerHTML = [...open, ...done].map(td=>`
+    <li class="${td.done?'done':''}">
+      <input type="checkbox" ${td.done?"checked":""} onchange="toggleTodo('${td.id}')" style="accent-color:var(--blue)">
+      <span>${esc(td.text)}</span>
+      <button class="del" onclick="delTodo('${td.id}')">✕</button>
+    </li>`).join("");
+  document.getElementById("todo-empty").style.display = db.todos.length ? "none" : "block";
+}
 const monday = d => { const x = new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; };
 
 /* progressive half-marathon plan: weekly km target from weeks-until-race */
@@ -391,10 +456,6 @@ function renderRuns(){
   document.getElementById("race-date").value = db.settings.raceDate;
   const days = Math.ceil((new Date(db.settings.raceDate) - new Date())/86400000);
   document.getElementById("race-days").textContent = days > 0 ? days : (days===0 ? "TODAY" : "done");
-  // matura countdown
-  document.getElementById("matura-date").value = db.settings.maturaDate;
-  const mDays = Math.ceil((new Date(db.settings.maturaDate) - new Date())/86400000);
-  document.getElementById("matura-days").textContent = mDays > 0 ? mDays : (mDays===0 ? "TODAY" : "done 🎉");
   // this week's plan
   const monThis = monday(new Date());
   const weeksToRace = Math.max(0, Math.floor((new Date(db.settings.raceDate) - monThis)/(7*86400000)));
@@ -467,7 +528,12 @@ function addLead(e){
     status:"To contact", created:today()});
   save(); e.target.reset(); renderAgency();
 }
-function delLead(id){ db.leads = db.leads.filter(l=>l.id!==id); save(); renderAgency(); }
+function delLead(id){
+  const l = db.leads.find(x=>x.id===id);
+  if(!l) return;
+  if(!confirm(`Delete lead "${l.name}"?\n\nStatus, notes and follow-up date will be lost.`)) return;
+  db.leads = db.leads.filter(x=>x.id!==id); save(); renderAgency();
+}
 function setLeadStatus(id,s){ const l=db.leads.find(x=>x.id===id); if(l){ l.status=s; save(); renderAgency(); } }
 function setLeadNext(id,v){ const l=db.leads.find(x=>x.id===id); if(l){ l.next = sDate(v); save(); renderAgency(); } }
 const isOverdue = l => l.next && l.next < today() && !["Won","Lost"].includes(l.status);
@@ -552,8 +618,8 @@ function importData(input){
 
 /* ---------- init ---------- */
 document.getElementById("r-date").value = today();
-renderRuns(); renderAgency();
-showTab(localStorage.getItem(KEY+"-tab") || "runs");
+renderToday(); renderRuns(); renderAgency();
+showTab(localStorage.getItem(KEY+"-tab") || "today");
 
 /* ---------- PWA: offline support (only when served over http/https) ---------- */
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
