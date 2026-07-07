@@ -717,7 +717,7 @@ function importData(input){
       const d = JSON.parse(txt);
       if(!d || !Array.isArray(d.runs) || !Array.isArray(d.leads)) throw 0;
       db = sanitize(d);
-      save(); renderRuns(); renderAgency();
+      save(); renderToday(); renderRuns(); renderAgency(); renderMoney();
       alert("Backup imported ✔");
     }catch(e){ alert("That file doesn't look like a Beshr HQ backup."); }
   });

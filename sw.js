@@ -1,4 +1,4 @@
-const CACHE = "beshr-hq-v5";
+const CACHE = "beshr-hq-v6";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
